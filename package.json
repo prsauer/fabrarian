@@ -2,6 +2,7 @@
   "name": "fabrarian",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Chrome extension that captures a fabrary.net access token and hands it to packrat.gg.",
   "scripts": {

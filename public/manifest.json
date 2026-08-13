@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Fabrarian",
+  "version": "0.1.0",
+  "description": "Captures your fabrary Cognito tokens and hands them to packrat.gg/auth.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://42xrd23ihbd47fjvsrt27ufpfe.appsync-api.us-east-2.amazonaws.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://fabrary.net/*",
+        "https://*.fabrary.net/*",
+        "https://fabrary.com/*",
+        "https://*.fabrary.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Fabrarian",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

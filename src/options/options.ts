@@ -13,6 +13,7 @@ import {
   type MainDecks,
 } from '../main-decks.js';
 import { readToken } from '../storage.js';
+import { readSettings, updateSettings, onSettingsChanged } from '../settings.js';
 
 setTokenSource(async () => (await readToken())?.value ?? null);
 
@@ -129,6 +130,18 @@ form.addEventListener('submit', async (event) => {
   } finally {
     submitBtn.disabled = false;
   }
+});
+
+// packrat.gg token handoff: opt-in, persisted in sync storage.
+const handoffToggle = $<HTMLInputElement>('packrat-handoff');
+handoffToggle.addEventListener('change', () => {
+  void updateSettings({ packratHandoff: handoffToggle.checked });
+});
+onSettingsChanged((s) => {
+  handoffToggle.checked = s.packratHandoff;
+});
+void readSettings().then((s) => {
+  handoffToggle.checked = s.packratHandoff;
 });
 
 onMainDecksChanged(render);

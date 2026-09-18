@@ -13,6 +13,22 @@
     </header>
 
     <section>
+      <h2>packrat.gg</h2>
+      <label class="toggle">
+        <input id="packrat-handoff" type="checkbox" />
+        <span>
+          <strong>Allow handing my fabrary session token to packrat.gg</strong>
+          <small>
+            Enables the popup's <em>Open in packrat.gg</em> button, which opens
+            <code>packrat.gg/auth</code> with your access and refresh tokens in the URL.
+            Off by default. The token is still captured locally either way (the
+            Sideboard and deck diff use it to talk to fabrary).
+          </small>
+        </span>
+      </label>
+    </section>
+
+    <section>
       <h2>Main decks</h2>
       <p class="lead">
         One reference deck per hero. When you open any other deck for that hero on fabrary, a compact

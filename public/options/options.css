@@ -15,7 +15,13 @@ body {
 }
 header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
 header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+section + section { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); }
 h2 { margin: 0 0 4px; font-size: 16px; }
+.toggle { display: flex; gap: 10px; align-items: flex-start; margin-top: 8px; cursor: pointer; }
+.toggle input { margin-top: 4px; accent-color: var(--accent); }
+.toggle span { display: grid; gap: 2px; }
+.toggle small { color: var(--muted); }
+.toggle code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
 .lead { margin: 0 0 16px; color: var(--muted); }
 
 #add { display: flex; gap: 8px; }

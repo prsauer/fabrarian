@@ -1,5 +1,6 @@
 import { packratUrl } from '../config.js';
 import { readToken, clearToken, type StoredToken } from '../storage.js';
+import { readSettings, onSettingsChanged, type Settings } from '../settings.js';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -11,6 +12,10 @@ const statusEl = $<HTMLParagraphElement>('status');
 const detailEl = $<HTMLDivElement>('detail');
 const openBtn = $<HTMLButtonElement>('open');
 const clearBtn = $<HTMLButtonElement>('clear');
+const handoffNote = $<HTMLParagraphElement>('handoff-off');
+
+let settings: Settings = { packratHandoff: false };
+let lastToken: StoredToken | null = null;
 
 function fmt(ms: number): string {
   return new Date(ms).toLocaleString();
@@ -32,6 +37,12 @@ function row(label: string, value: string): HTMLDivElement {
 }
 
 function render(token: StoredToken | null): void {
+  lastToken = token;
+  // The handoff button only exists when the user has opted into sending the
+  // token to packrat.gg; otherwise say so and point at the setting.
+  openBtn.hidden = !settings.packratHandoff;
+  handoffNote.hidden = settings.packratHandoff;
+
   if (!token) {
     statusEl.textContent = 'No token captured yet.';
     statusEl.classList.remove('expired');
@@ -60,6 +71,9 @@ function render(token: StoredToken | null): void {
 }
 
 openBtn.addEventListener('click', async () => {
+  // Re-check the live setting so a stale popup can never hand the token off.
+  const live = await readSettings();
+  if (!live.packratHandoff) return;
   const token = await readToken();
   if (!token) return;
   await chrome.tabs.create({ url: packratUrl(token.value, token.refreshValue) });
@@ -72,10 +86,20 @@ clearBtn.addEventListener('click', async () => {
   render(null);
 });
 
-$<HTMLAnchorElement>('options').addEventListener('click', (event) => {
-  event.preventDefault();
-  void chrome.runtime.openOptionsPage();
-  window.close();
+for (const id of ['options', 'options-handoff']) {
+  $<HTMLAnchorElement>(id).addEventListener('click', (event) => {
+    event.preventDefault();
+    void chrome.runtime.openOptionsPage();
+    window.close();
+  });
+}
+
+onSettingsChanged((next) => {
+  settings = next;
+  render(lastToken);
 });
 
-void readToken().then(render);
+void Promise.all([readSettings(), readToken()]).then(([s, token]) => {
+  settings = s;
+  render(token);
+});

@@ -17,8 +17,8 @@ const STYLE_ID = 'fabrarian-deck-diff-styles';
 
 const CSS = `
 #${PANEL_ID} {
-  position: fixed; right: 10px; top: 96px; z-index: 2147482000; width: 210px;
-  max-height: calc(100vh - 116px); display: flex; flex-direction: column;
+  position: fixed; right: 10px; top: 45px; z-index: 2147482000; width: 210px;
+  max-height: calc(100vh - 65px); display: flex; flex-direction: column;
   color: #e8e8ea; font: 12px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif;
   background: #17181cf2; border: 1px solid #2c2e36; border-radius: 10px;
   box-shadow: 0 8px 28px #0009; backdrop-filter: blur(6px);

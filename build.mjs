@@ -50,11 +50,15 @@ const shared = {
 
 /** @type {esbuild.BuildOptions[]} */
 const configs = [
-  // ES modules: service worker + popup.
+  // ES modules: service worker + popup + options page.
   {
     ...shared,
     format: 'esm',
-    entryPoints: [path.join(src, 'background.ts'), path.join(src, 'popup', 'popup.ts')],
+    entryPoints: [
+      path.join(src, 'background.ts'),
+      path.join(src, 'popup', 'popup.ts'),
+      path.join(src, 'options', 'options.ts'),
+    ],
   },
   // Classic script: content script (injected into the page's isolated world).
   {

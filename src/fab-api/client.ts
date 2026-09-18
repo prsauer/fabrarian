@@ -22,8 +22,20 @@ export function currentAccessToken(): string | null {
   return localStorage.getItem(`${cognitoPrefix(username)}.accessToken`);
 }
 
+type TokenSource = () => Promise<string | null> | string | null;
+let tokenSource: TokenSource = currentAccessToken;
+
+/**
+ * Where the client gets its access token. The content script uses fabrary's
+ * localStorage (the default); extension pages, which can't see it, use the
+ * token mirrored into chrome.storage instead.
+ */
+export function setTokenSource(source: TokenSource): void {
+  tokenSource = source;
+}
+
 async function gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
-  const token = currentAccessToken();
+  const token = await tokenSource();
   if (!token) throw new FabApiError('Not signed in to fabrary.', 'no-token');
 
   let res: Response;
@@ -57,7 +69,8 @@ const GET_DECK = `
       deckId
       name
       format
-      hero { name hero }
+      heroIdentifier
+      hero { cardIdentifier name hero }
       matchups { matchupId name notes preferredTurnOrder heroIdentifiers }
       deckCards {
         cardIdentifier
@@ -77,7 +90,10 @@ const GET_DECK = `
           defense
           types
           subtypes
+          talents
           typeText
+          functionalText
+          keywords
           rarity
           defaultImage
           printings { print image }

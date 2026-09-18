@@ -72,4 +72,10 @@ clearBtn.addEventListener('click', async () => {
   render(null);
 });
 
+$<HTMLAnchorElement>('options').addEventListener('click', (event) => {
+  event.preventDefault();
+  void chrome.runtime.openOptionsPage();
+  window.close();
+});
+
 void readToken().then(render);

@@ -1,0 +1,39 @@
+/* Options page: the hero -> main deck table. */
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff; --fg: #1a1a1a; --muted: #666; --line: #e3e3e3; --accent: #b31217; --card: #f7f7f8;
+  --ok: #2e7d32; --warn: #c47a00; --err: #c62828;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1c1c1e; --fg: #f0f0f0; --muted: #9a9a9a; --line: #333; --accent: #ff5a5f; --card: #26262a;
+    --ok: #5ccb6f; --warn: #e0a53a; --err: #ef6a5e; }
+}
+* { box-sizing: border-box; }
+body {
+  max-width: 640px; margin: 0 auto; padding: 28px 20px 48px;
+  font: 14px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; background: var(--bg); color: var(--fg);
+}
+header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+h2 { margin: 0 0 4px; font-size: 16px; }
+.lead { margin: 0 0 16px; color: var(--muted); }
+
+#add { display: flex; gap: 8px; }
+#ref { flex: 1; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: var(--bg); color: var(--fg); }
+#ref:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+button { padding: 9px 14px; border: 1px solid transparent; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; background: var(--accent); color: #fff; }
+button.ghost { background: transparent; border-color: var(--line); color: var(--fg); padding: 5px 10px; font-weight: 500; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.notice { margin: 10px 0 0; padding: 8px 11px; border-radius: 8px; background: var(--card); color: var(--muted); }
+.notice.is-ok { color: var(--ok); } .notice.is-warn { color: var(--warn); } .notice.is-error { color: var(--err); }
+
+.decks { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
+.deck { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+.deck img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #0003; flex: 0 0 auto; }
+.deck .hero-fallback { width: 40px; height: 40px; border-radius: 50%; background: #0003; flex: 0 0 auto; }
+.deck .text { flex: 1; min-width: 0; }
+.deck .hero { font-weight: 600; }
+.deck .name { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deck .name a { color: inherit; }
+.empty { margin-top: 18px; color: var(--muted); }

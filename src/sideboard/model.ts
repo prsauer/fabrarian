@@ -28,19 +28,130 @@ export interface Configuration {
   id: string;
   name: string;
   isBase: boolean;
-  /** Canonical hero card identifier for a hero matchup, or null (archetype / base). */
-  heroId: string | null;
+  /**
+   * Canonical hero card identifiers for a hero matchup (a matchup can cover
+   * several heroes); empty for archetype matchups and the base configuration.
+   */
+  heroIds: string[];
 }
 
 export function getConfigurations(deck: Deck): Configuration[] {
-  const base: Configuration = { id: BASE_CONFIG_ID, name: 'Main deck', isBase: true, heroId: null };
+  const base: Configuration = { id: BASE_CONFIG_ID, name: 'Main deck', isBase: true, heroIds: [] };
   const matchups = deck.matchups.map((m) => ({
     id: m.matchupId,
     name: m.name,
     isBase: false,
-    heroId: m.heroIdentifiers?.find((h): h is string => !!h) ?? null,
+    heroIds: [...new Set((m.heroIdentifiers ?? []).filter((h): h is string => !!h))],
   }));
   return [base, ...matchups];
+}
+
+/** Lowercase, accent-stripped alphanumerics only — for loose name comparisons. */
+function foldChar(ch: string): string {
+  return ch
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * How many leading characters of `text` spell out a prefix of `hero` (a hero
+ * name or its slug), ignoring case, accents and punctuation, ending on a word
+ * boundary in `text`. 0 if `text` doesn't start with part of the hero's name.
+ */
+function heroPrefixLength(text: string, hero: string): number {
+  const heroChars = [...hero].map(foldChar).filter(Boolean);
+  let h = 0;
+  let matched = 0; // index in `text` just past the last matched word
+  let sawWord = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = foldChar(text[i] ?? '');
+    if (!c) {
+      // Separator: everything up to here matched, so this is a valid cut point.
+      if (sawWord) matched = i;
+      continue;
+    }
+    if (h >= heroChars.length || heroChars[h] !== c) break;
+    h += 1;
+    sawWord = true;
+    if (i === text.length - 1) matched = text.length;
+  }
+  return matched;
+}
+
+/**
+ * The part of a matchup's name that isn't just its hero(es)' name(s): "Fang
+ * (fatigue build)" for hero Fang → "(fatigue build)"; "Dori" for Dorinthea →
+ * "" (a bare prefix of the hero's name carries no extra information). Hero
+ * prefixes are stripped repeatedly so "Fang / Dori (aggro)" → "(aggro)".
+ */
+export function matchupExtraLabel(name: string, heroIds: string[]): string {
+  if (!heroIds.length) return name.trim();
+  let rest = name.trim();
+  for (;;) {
+    const cut = Math.max(0, ...heroIds.map((id) => heroPrefixLength(rest, id)));
+    if (cut === 0) break;
+    rest = rest.slice(cut).replace(/^[\s\-–—:,|/&+]+/, '');
+  }
+  return rest;
+}
+
+/** A deck stat that only matters for particular heroes (e.g. Fang's draconic reactions). */
+export interface ConditionalStat {
+  /** Short label for the stats bar. */
+  label: string;
+  /** Hover text spelling the label out. */
+  title: string;
+  /** Whether an in-deck card counts toward this stat. */
+  matches: (dc: DeckCard) => boolean;
+}
+
+interface HeroStats {
+  /** Which heroes this applies to — tested against the deck's hero identifier and name. */
+  hero: (identifier: string, name: string) => boolean;
+  stats: ConditionalStat[];
+}
+
+const hasAll = (list: (string | null)[] | null | undefined, ...wanted: string[]): boolean => {
+  const have = lowerList(list);
+  return wanted.every((w) => have.includes(w));
+};
+
+/** Hero-specific stats, in display order. Identifiers are fabrary card slugs. */
+const HERO_STATS: HeroStats[] = [
+  {
+    // Fang, Dracai of Blades (and young Fang): cares about Draconic attack
+    // reactions and Draconic instants (both can be played from the deck's
+    // top-of-deck / reaction windows his abilities open).
+    hero: (id, name) => /^fang(-|$)/.test(id) || /^fang/i.test(name),
+    stats: [
+      {
+        label: 'Draconic AR/Inst',
+        title: 'Draconic attack reactions + Draconic instants',
+        matches: (dc) =>
+          hasAll(dc.card.talents, 'draconic') &&
+          (hasAll(dc.card.types, 'attack reaction') || hasAll(dc.card.types, 'instant')),
+      },
+    ],
+  },
+];
+
+/** The conditional stats that apply to this deck's hero (empty for most heroes). */
+export function conditionalStatsFor(deck: Deck): ConditionalStat[] {
+  const id = (deck.heroIdentifier ?? deck.hero?.cardIdentifier ?? '').toLowerCase();
+  const name = deck.hero?.name ?? '';
+  return HERO_STATS.filter((h) => h.hero(id, name)).flatMap((h) => h.stats);
+}
+
+/** In-deck copies (for the configuration) matching a conditional stat. */
+export function countMatching(deck: Deck, configId: string, stat: ConditionalStat): number {
+  let n = 0;
+  for (const dc of deck.deckCards) {
+    if (!isDeckCard(dc) || !stat.matches(dc)) continue;
+    n += effectiveQuantities(dc, configId).quantity;
+  }
+  return n;
 }
 
 /** Copies of this card the player has registered — the pool sideboarding shuffles. */
@@ -151,6 +262,126 @@ export function totalsFor(deck: Deck, configId: string): DeckTotals {
     totals.sideboardCards += eff.sideboardQuantity;
   }
   return totals;
+}
+
+/** Breakdown of the main-deck cards in the deck for a configuration. */
+export interface DeckStats {
+  /** Copies by pitch: 1 = red, 2 = yellow, 3 = blue. */
+  red: number;
+  yellow: number;
+  blue: number;
+  attackActions: number;
+  nonAttackActions: number;
+  attackReactions: number;
+  defenseReactions: number;
+  /** Attack actions with printed power of 6 or more. */
+  bigAttacks: number;
+  /** Sum of printed defense across all in-deck copies (cards with no block count 0). */
+  totalBlock: number;
+  /** In-deck copies with a printed defense value (the divisor for the average). */
+  blockingCards: number;
+  /** Mean defense over `blockingCards`, or 0 when nothing blocks. */
+  averageBlock: number;
+  /** Sum of "Arcane Barrier N" across the weapons/equipment currently equipped. */
+  arcaneBarrier: number;
+}
+
+/** Power threshold for a "big" attack (Dominate-relevant, Fyendal's/blue-trigger-relevant). */
+export const BIG_ATTACK_POWER = 6;
+
+function lowerList(list: (string | null)[] | null | undefined): string[] {
+  return (list ?? []).filter((t): t is string => !!t).map((t) => t.toLowerCase());
+}
+
+/** Card categorisation used by the stats bar (attack action / non-attack action / reactions). */
+export function cardKind(
+  dc: DeckCard,
+): 'attack' | 'non-attack' | 'attack-reaction' | 'defense-reaction' | 'other' {
+  const types = lowerList(dc.card.types);
+  const subtypes = lowerList(dc.card.subtypes);
+  if (types.includes('attack reaction')) return 'attack-reaction';
+  if (types.includes('defense reaction')) return 'defense-reaction';
+  if (types.includes('action')) return subtypes.includes('attack') ? 'attack' : 'non-attack';
+  return 'other';
+}
+
+/** Printed power as a number, or null when blank/non-numeric (e.g. "*"). */
+export function cardPower(dc: DeckCard): number | null {
+  if (typeof dc.card.power === 'number') return dc.card.power;
+  const special = dc.card.specialPower?.trim();
+  if (special && /^\d+$/.test(special)) return Number(special);
+  return null;
+}
+
+/**
+ * The card's printed Arcane Barrier value, or 0. Gated on the keyword list so
+ * cards that merely mention arcane barrier in reminder text don't count, and
+ * reads the first "Arcane Barrier N" in the rules text.
+ */
+export function arcaneBarrier(dc: DeckCard): number {
+  const hasKeyword = lowerList(dc.card.keywords).includes('arcane barrier');
+  if (!hasKeyword) return 0;
+  const m = /arcane barrier\s+(\d+)/i.exec(dc.card.functionalText ?? '');
+  return m ? Number(m[1]) : 0;
+}
+
+export function statsFor(deck: Deck, configId: string): DeckStats {
+  const stats: DeckStats = {
+    red: 0,
+    yellow: 0,
+    blue: 0,
+    attackActions: 0,
+    nonAttackActions: 0,
+    attackReactions: 0,
+    defenseReactions: 0,
+    bigAttacks: 0,
+    totalBlock: 0,
+    blockingCards: 0,
+    averageBlock: 0,
+    arcaneBarrier: 0,
+  };
+  for (const dc of deck.deckCards) {
+    const n = effectiveQuantities(dc, configId).quantity;
+    if (n <= 0) continue;
+    if (!isDeckCard(dc)) {
+      // Equipped gear (weapons + equipment slots) contributes its arcane barrier.
+      const section = cardSection(dc);
+      if (section !== 'Deck') stats.arcaneBarrier += arcaneBarrier(dc) * n;
+      continue;
+    }
+    if (typeof dc.card.defense === 'number') {
+      stats.totalBlock += dc.card.defense * n;
+      stats.blockingCards += n;
+    }
+    switch (dc.card.pitch) {
+      case 1:
+        stats.red += n;
+        break;
+      case 2:
+        stats.yellow += n;
+        break;
+      case 3:
+        stats.blue += n;
+        break;
+    }
+    switch (cardKind(dc)) {
+      case 'attack':
+        stats.attackActions += n;
+        if ((cardPower(dc) ?? 0) >= BIG_ATTACK_POWER) stats.bigAttacks += n;
+        break;
+      case 'non-attack':
+        stats.nonAttackActions += n;
+        break;
+      case 'attack-reaction':
+        stats.attackReactions += n;
+        break;
+      case 'defense-reaction':
+        stats.defenseReactions += n;
+        break;
+    }
+  }
+  stats.averageBlock = stats.blockingCards ? stats.totalBlock / stats.blockingCards : 0;
+  return stats;
 }
 
 /** Cards that can be sideboarded (have at least one registered copy), sorted for display. */

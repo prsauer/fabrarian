@@ -3,19 +3,23 @@
 // sideboard is dimmed. Clicking a tile toggles that copy between deck and sideboard.
 // Edits are optimistic and persisted per-card to fabrary via updateDeckCard,
 // reverting on failure.
-import { cardImageUrl, heroIconUrl, heroSlug } from '../config.js';
+import { cardImageUrl, heroIconUrl } from '../config.js';
 import { getCard, getDeck, updateDeckCard, FabApiError } from '../fab-api/client.js';
 import type { Deck, DeckCard } from '../fab-api/types.js';
 import {
   BASE_CONFIG_ID,
   cardImageId,
   cardSection,
+  conditionalStatsFor,
+  countMatching,
   effectiveQuantities,
   getConfigurations,
+  matchupExtraLabel,
   pool,
   SECTION_ORDER,
   setInDeck,
   sideboardableCards,
+  statsFor,
   totalsFor,
 } from './model.js';
 import { ensureStyles } from './styles.js';
@@ -67,8 +71,12 @@ export class SideboardPanel {
   private readonly chains = new Map<string, Promise<unknown>>();
   /** hero identifier -> full-card art URL (null = none), for hover previews. */
   private readonly heroCards = new Map<string, string | null>();
+  /** matchup id -> the small card-count badge on its hero pill, refreshed with the counts. */
+  private readonly pillBadges = new Map<string, HTMLElement>();
   private countsEl: HTMLElement | null = null;
+  private statsEl: HTMLElement | null = null;
   private statusEl: HTMLElement | null = null;
+  private refreshing = false;
 
   constructor(
     private readonly root: HTMLElement,
@@ -85,6 +93,39 @@ export class SideboardPanel {
       this.render();
     } catch (err) {
       this.renderError(err);
+    }
+  }
+
+  /**
+   * Re-fetch the deck from fabrary and re-render, keeping the current panel on
+   * screen meanwhile so switching back to the tab doesn't flash "Loading…".
+   * Waits for any in-flight saves so their results aren't overwritten by a
+   * fetch that raced ahead of them. Errors keep the existing view and surface
+   * in the status slot; a first load that failed retries in full.
+   */
+  async refresh(): Promise<void> {
+    if (!this.deck) {
+      await this.load();
+      return;
+    }
+    if (this.refreshing) return;
+    this.refreshing = true;
+    this.setStatus('saving', 'Refreshing…');
+    try {
+      await Promise.allSettled([...this.chains.values()]);
+      const fresh = await getDeck(this.deckId);
+      this.deck = fresh;
+      // Drop the selected matchup if it no longer exists on the deck.
+      if (!getConfigurations(fresh).some((c) => c.id === this.configId)) {
+        this.configId = BASE_CONFIG_ID;
+      }
+      this.status = { kind: 'idle', text: '' };
+      this.render();
+    } catch (err) {
+      this.setStatus('error', 'Refresh failed');
+      console.error('[fabrarian] sideboard refresh failed', err);
+    } finally {
+      this.refreshing = false;
     }
   }
 
@@ -181,6 +222,7 @@ export class SideboardPanel {
 
   private renderBar(deck: Deck): HTMLElement {
     const matchups = h('div', { class: 'fab-sb-matchups' });
+    this.pillBadges.clear();
     for (const cfg of getConfigurations(deck)) {
       const active = cfg.id === this.configId;
 
@@ -194,28 +236,54 @@ export class SideboardPanel {
         continue;
       }
 
-      // Hero matchups render as a circular portrait; on a missing icon the pill
-      // falls back to a text button (archetype / class matchups).
-      const iconId = cfg.heroId ?? heroSlug(cfg.name);
-      const icon = h('img', { class: 'fab-sb-hero', alt: cfg.name, src: heroIconUrl(iconId) });
+      // Matchups with explicitly selected heroes render as circular portraits —
+      // one per hero, overlapped into a single stadium-shaped pill when a matchup
+      // covers several. Matchups without heroes (archetype / class) are text
+      // pills; the name is never used to guess a hero. If every icon fails to
+      // load, the pill degrades to a text button too.
+      const iconIds = cfg.heroIds;
       const label = h('span', { class: 'fab-sb-pill-label' }, [cfg.name]);
       const pill = h(
         'button',
-        { class: 'fab-sb-pill fab-sb-pill-hero' + (active ? ' is-active' : ''), title: cfg.name },
-        [icon, label],
+        {
+          class:
+            'fab-sb-pill' +
+            (iconIds.length ? ' fab-sb-pill-hero' : '') +
+            (iconIds.length > 1 ? ' is-multi' : '') +
+            (active ? ' is-active' : ''),
+          title: cfg.name,
+        },
+        [label],
       );
-      icon.addEventListener('error', () => {
-        icon.remove();
-        pill.classList.remove('fab-sb-pill-hero'); // becomes a text pill
-      });
-      attachHoverPreviewLazy(pill, () => this.heroCardImage(iconId));
+      let icons = 0;
+      for (const iconId of iconIds) {
+        const icon = h('img', { class: 'fab-sb-hero', alt: '', src: heroIconUrl(iconId) });
+        icons += 1;
+        icon.addEventListener('error', () => {
+          icon.remove();
+          icons -= 1;
+          if (icons === 0) pill.classList.remove('fab-sb-pill-hero', 'is-multi'); // becomes a text pill
+        });
+        // Each portrait previews its own hero card.
+        attachHoverPreviewLazy(icon, () => this.heroCardImage(iconId));
+        pill.insertBefore(icon, label);
+      }
+      // Whatever the matchup name says beyond the hero's own name ("(fatigue
+      // build)") is shown beside the portrait; a bare hero name shows nothing.
+      const extra = matchupExtraLabel(cfg.name, cfg.heroIds);
+      if (extra) pill.append(h('span', { class: 'fab-sb-pill-extra' }, [extra]));
+      // Small white badge: how many cards are in the deck for this matchup.
+      const badge = h('span', { class: 'fab-sb-pill-count', 'aria-hidden': 'true' });
+      pill.append(badge);
+      this.pillBadges.set(cfg.id, badge);
       pill.addEventListener('click', () => this.selectConfig(cfg.id));
       matchups.append(pill);
     }
 
     this.countsEl = h('div', { class: 'fab-sb-counts' });
+    this.statsEl = h('div', { class: 'fab-sb-stats' });
     this.statusEl = h('div', { class: 'fab-sb-status' });
-    return h('div', { class: 'fab-sb-bar' }, [matchups, this.countsEl, this.statusEl]);
+    return h('div', { class: 'fab-sb-bar' }, [matchups, this.countsEl, this.statusEl, this.statsEl]);
   }
 
   private selectConfig(id: string): void {
@@ -356,7 +424,70 @@ export class SideboardPanel {
       h('span', { class: legal }, [`Deck `, h('b', {}, [`${deckCards}`]), `/${target}`]),
       h('span', {}, [`Sideboard `, h('b', {}, [`${sideboardCards}`])]),
     );
+    this.updateStats();
+    this.updatePillBadges();
     this.renderStatus();
+  }
+
+  /** Refresh every hero pill's in-deck card count (each is for its own matchup). */
+  private updatePillBadges(): void {
+    if (!this.deck) return;
+    for (const [configId, badge] of this.pillBadges) {
+      badge.textContent = `${totalsFor(this.deck, configId).deckCards}`;
+    }
+  }
+
+  /** The pitch-colour and card-type breakdown of the in-deck cards. */
+  private updateStats(): void {
+    if (!this.deck || !this.statsEl) return;
+    const s = statsFor(this.deck, this.configId);
+    const stat = (label: string, value: number | string, cls = '', title = ''): HTMLElement =>
+      h('span', { class: `fab-sb-stat ${cls}`.trim(), title: title || label }, [
+        h('b', {}, [`${value}`]),
+        h('span', { class: 'fab-sb-stat-label' }, [label]),
+      ]);
+    const pip = (cls: string, value: number, title: string): HTMLElement =>
+      h('span', { class: `fab-sb-stat fab-sb-pitch ${cls}`, title }, [
+        h('i', { class: 'fab-sb-pip', 'aria-hidden': 'true' }),
+        h('b', {}, [`${value}`]),
+      ]);
+    this.statsEl.replaceChildren(
+      h('span', { class: 'fab-sb-stat-group' }, [
+        pip('is-red', s.red, 'Red (pitch 1)'),
+        pip('is-yellow', s.yellow, 'Yellow (pitch 2)'),
+        pip('is-blue', s.blue, 'Blue (pitch 3)'),
+      ]),
+      h('span', { class: 'fab-sb-stat-group' }, [
+        stat('Attacks', s.attackActions, '', 'Attack actions'),
+        stat('6+', s.bigAttacks, 'is-sub', 'Attack actions with 6 or more power'),
+        stat('Non-attacks', s.nonAttackActions, '', 'Non-attack actions'),
+        stat('AR', s.attackReactions, '', 'Attack reactions'),
+        stat('DR', s.defenseReactions, '', 'Defense reactions'),
+      ]),
+      h('span', { class: 'fab-sb-stat-group' }, [
+        stat('Block', s.totalBlock, '', 'Total block value of in-deck cards'),
+        stat(
+          'avg',
+          s.averageBlock.toFixed(2),
+          'is-sub',
+          `Average block over the ${s.blockingCards} in-deck cards that have a defense value`,
+        ),
+      ]),
+      h('span', { class: 'fab-sb-stat-group' }, [
+        stat('Arcane Barrier', s.arcaneBarrier, '', 'Total Arcane Barrier on the equipped weapons and equipment'),
+      ]),
+    );
+    // Hero-specific stats (e.g. Fang's draconic attack reactions), when any apply.
+    const conditional = conditionalStatsFor(this.deck);
+    if (conditional.length) {
+      this.statsEl.append(
+        h(
+          'span',
+          { class: 'fab-sb-stat-group is-hero' },
+          conditional.map((c) => stat(c.label, countMatching(this.deck!, this.configId, c), '', c.title)),
+        ),
+      );
+    }
   }
 
   private renderStatus(): void {

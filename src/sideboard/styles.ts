@@ -28,17 +28,73 @@ export const SIDEBOARD_CSS = `
 }
 
 /* Hero matchup: icon-only circular portrait, like fabrary's Add-matchups modal. */
-.fab-sb-pill-hero { padding: 2px; gap: 0; border-radius: 50%; background: transparent; border: 2px solid #3a3c45; }
+.fab-sb-pill-hero { padding: 2px; gap: 0; border-radius: 999px; background: transparent; border: 2px solid #3a3c45; }
 .fab-sb-pill-hero:hover { background: transparent; border-color: #565964; }
 .fab-sb-pill-hero.is-active { background: transparent; border-color: #e6403a; box-shadow: 0 0 0 2px #e6403a66; }
 .fab-sb-pill-hero .fab-sb-hero { width: 32px; height: 32px; border: 0; }
 .fab-sb-pill-hero .fab-sb-pill-label { display: none; }
+/* Extra matchup text beyond the hero's name, small and white beside the portrait. */
+.fab-sb-pill-hero .fab-sb-pill-extra {
+  margin: 0 6px 0 5px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 10px; font-weight: 600; color: #fff; text-shadow: 0 1px 1px #000;
+}
+.fab-sb-pill:not(.fab-sb-pill-hero) .fab-sb-pill-extra { display: none; } /* text pill shows the full name */
+/* In-deck card count for the matchup, overlaid on the portrait's lower edge. */
+.fab-sb-pill-hero { position: relative; }
+.fab-sb-pill-count {
+  position: absolute; left: 50%; bottom: -1px; transform: translateX(-50%);
+}
+.fab-sb-pill-hero:has(.fab-sb-pill-extra) .fab-sb-pill-count { left: 18px; }
+.fab-sb-pill-hero.is-multi:has(.fab-sb-pill-extra) .fab-sb-pill-count { left: 20px; }
+.fab-sb-pill-count {
+  padding: 0 4px; border-radius: 999px; line-height: 12px;
+  font-size: 9px; font-weight: 800; letter-spacing: .02em; font-variant-numeric: tabular-nums;
+  color: #fff; background: #000c; text-shadow: 0 1px 1px #000; pointer-events: none;
+}
+/* Text pills (archetype matchups, or a hero whose icon failed) keep the count
+   inline after the label as a small white chip instead of an overlay. */
+.fab-sb-pill:not(.fab-sb-pill-hero) .fab-sb-pill-count {
+  position: static; transform: none; margin-left: 2px; line-height: 14px; font-size: 10px;
+  background: #0006; text-shadow: none;
+}
+.fab-sb-pill.is-active:not(.fab-sb-pill-hero) .fab-sb-pill-count { background: #0004; }
+/* Several heroes in one matchup: portraits overlap into a single stadium so the
+   group reads as one selectable unit; the outline ring encloses all of them. */
+.fab-sb-pill-hero.is-multi { padding: 2px 4px; }
+.fab-sb-pill-hero.is-multi .fab-sb-hero { box-shadow: 0 0 0 2px #17181c; transition: transform .12s; }
+.fab-sb-pill-hero.is-multi .fab-sb-hero + .fab-sb-hero { margin-left: -10px; }
+.fab-sb-pill-hero.is-multi .fab-sb-hero:hover { transform: scale(1.15); z-index: 1; position: relative; }
+.fab-sb-pill-hero.is-multi.is-active .fab-sb-hero { box-shadow: 0 0 0 2px #17181c, 0 0 0 3px #e6403a88; }
 
 .fab-sb-counts { display: flex; gap: 12px; align-items: center; font-variant-numeric: tabular-nums; }
 .fab-sb-counts b { color: #fff; }
 .fab-sb-legal { color: #3fbf6f; } .fab-sb-illegal { color: #e0a53a; }
+/* Second row of the bar: pitch colours and card-type breakdown of the in-deck cards. */
+.fab-sb-stats {
+  flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 6px 0; align-items: center;
+  padding-top: 8px; border-top: 1px solid #26272e; font-size: 12px; color: #9a9ca6;
+  font-variant-numeric: tabular-nums;
+}
+.fab-sb-stat-group { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
+/* Subtle hairline between groups (colours | card types | block | barrier | hero). */
+.fab-sb-stat-group { padding-right: 18px; }
+.fab-sb-stat-group + .fab-sb-stat-group { padding-left: 18px; border-left: 1px solid #2c2e36; }
+.fab-sb-stat-group:last-child { padding-right: 0; }
+.fab-sb-stat { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+/* Hero-conditional stats: tinted so they read as "special for this hero". */
+.fab-sb-stat-group.is-hero .fab-sb-stat { color: #d9a441; }
+.fab-sb-stat-group.is-hero .fab-sb-stat b { color: #ffd77a; }
+.fab-sb-stat b { color: #fff; font-weight: 700; }
+.fab-sb-stat.is-sub { color: #6b6d77; margin-left: -6px; }
+.fab-sb-stat.is-sub b { color: #c9cad1; }
+.fab-sb-stat.is-sub::before { content: '('; } .fab-sb-stat.is-sub::after { content: ')'; }
+.fab-sb-pitch { gap: 5px; }
+.fab-sb-pip { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 1px solid #0008; }
+.fab-sb-pitch.is-red .fab-sb-pip { background: #d2302c; }
+.fab-sb-pitch.is-yellow .fab-sb-pip { background: #e6b800; }
+.fab-sb-pitch.is-blue .fab-sb-pip { background: #2f6fd6; }
 /* Fixed box so the save indicator can't shift the bar when text appears. */
-.fab-sb-status { flex: 0 0 auto; width: 64px; min-height: 1.2em; text-align: right; font-size: 12px; color: #8a8c96; }
+.fab-sb-status { flex: 0 0 auto; width: 84px; min-height: 1.2em; text-align: right; font-size: 12px; color: #8a8c96; }
 .fab-sb-status.is-saving { color: #e0a53a; } .fab-sb-status.is-saved { color: #3fbf6f; } .fab-sb-status.is-error { color: #e0483a; }
 
 .fab-sb-grid {

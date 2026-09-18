@@ -50,28 +50,6 @@ export function cardImageUrl(image: string): string {
   return `https://content.fabrary.net/cards/${image}.webp`;
 }
 
-/** Hero display names whose icon slug differs from a plain slugify of the name. */
-const HERO_SLUG_OVERRIDES: Record<string, string> = {
-  Ira: 'ira-crimson-haze',
-};
-
-/**
- * Slug for a hero's icon/card identifier, derived from a matchup name when the
- * canonical `heroIdentifiers` aren't available (older matchups). A few short
- * names need an override.
- */
-export function heroSlug(heroName: string): string {
-  return (
-    HERO_SLUG_OVERRIDES[heroName] ??
-    heroName
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-  );
-}
-
 /** Circular hero icon on the fabrary CDN. Unknown heroes 404 — hide the icon on error. */
 export function heroIconUrl(heroSlugOrId: string): string {
   return `https://content.fabrary.net/heroes/${heroSlugOrId}.webp`;
@@ -80,4 +58,12 @@ export function heroIconUrl(heroSlugOrId: string): string {
 /** Pull the deck id out of a fabrary deck URL path, or null if it isn't one. */
 export function deckIdFromPath(pathname: string): string | null {
   return pathname.match(/\/decks\/([^/?#]+)/)?.[1] ?? null;
+}
+
+/**
+ * The deck id only when the path is exactly a deck page (`/decks/<id>`, with an
+ * optional trailing slash) — not a sub-route beneath it.
+ */
+export function deckPageIdFromPath(pathname: string): string | null {
+  return pathname.match(/^\/decks\/([^/?#]+)\/?$/)?.[1] ?? null;
 }

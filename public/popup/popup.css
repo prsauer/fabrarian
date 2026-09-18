@@ -95,3 +95,7 @@ button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.foot { margin: 12px 0 0; text-align: right; }
+.foot a { color: var(--muted); text-decoration: none; }
+.foot a:hover { color: var(--fg); text-decoration: underline; }

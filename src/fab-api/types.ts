@@ -34,7 +34,13 @@ export interface Card {
   defense?: number | null;
   types?: (string | null)[] | null;
   subtypes?: (string | null)[] | null;
+  /** Talents, e.g. ["Draconic"], ["Shadow", "Runeblade"]. */
+  talents?: (string | null)[] | null;
   typeText?: string | null;
+  /** Rules text with markdown-ish emphasis, e.g. "**Arcane Barrier 2** *(…)*". */
+  functionalText?: string | null;
+  /** Keyword names on the card, e.g. ["Arcane Barrier", "Blade Break"]. */
+  keywords?: (string | null)[] | null;
   rarity?: string | null;
   /** Image slug of the default printing (e.g. "PEN309"), used to build the art URL. */
   defaultImage?: string | null;
@@ -57,7 +63,8 @@ export interface Deck {
   deckId: string;
   name: string;
   format?: string | null;
-  hero?: { name?: string | null; hero?: string | null } | null;
+  heroIdentifier?: string | null;
+  hero?: { cardIdentifier?: string | null; name?: string | null; hero?: string | null } | null;
   matchups: Matchup[];
   deckCards: DeckCard[];
 }

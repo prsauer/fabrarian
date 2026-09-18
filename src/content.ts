@@ -7,6 +7,7 @@ import { jwtExpiry } from './jwt.js';
 import { readToken, writeToken, type StoredToken } from './storage.js';
 import { installDeckTab } from './deck-tab.js';
 import { installSideboardTab } from './sideboard/tab.js';
+import { installDeckDiff } from './deck-diff/panel.js';
 
 interface CognitoTokens {
   username: string;
@@ -60,3 +61,6 @@ installDeckTab();
 
 // Inject the talishar-style "Sideboard" tab into deck pages.
 installSideboardTab();
+
+// Show the compact "vs main deck" diff in the margin of deck pages.
+installDeckDiff();

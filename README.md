@@ -1,7 +1,7 @@
 # Fabrarian
 
 A Chrome (Manifest V3) companion extension for [fabrary.net](https://fabrary.net),
-the Flesh and Blood deckbuilder. It adds three things:
+the Flesh and Blood deckbuilder. It adds four things:
 
 1. **Token handoff** — captures your fabrary access/refresh token and opens it in
    **packrat.gg**: `https://packrat.gg/auth?token=<accessToken>&refreshToken=<rt>`.
@@ -9,6 +9,9 @@ the Flesh and Blood deckbuilder. It adds three things:
    `https://packrat.gg/analyze/<deckId>`.
 3. **Sideboard tab** — a talishar-style, per-matchup sideboard editor injected as a
    **Sideboard** tab, backed by fabrary's own API so changes save to your deck.
+4. **Main-deck diff** — pick one "main" deck per hero in the extension's options;
+   every other deck for that hero then shows a compact card-difference list in the
+   page's right margin.
 
 ---
 
@@ -59,7 +62,14 @@ Scripts:
 - **Sideboard tab** — on a deck you own, open the injected **Sideboard** tab. Pick a
   matchup (hero circles / archetype pills), then click cards to move copies between
   the deck and the sideboard. Equipment slots are single-select; changes save back
-  to fabrary automatically. Hover a card ~0.85s for a full-size preview.
+  to fabrary automatically. Hover a card ~0.85s for a full-size preview. The bar
+  shows deck/sideboard counts, pitch colours, card-type counts, block totals,
+  equipped arcane barrier, and hero-specific stats (e.g. Fang's draconic AR/instants).
+- **Main decks** — toolbar icon → **Main decks…** (or the extension's Options page).
+  Paste a fabrary deck link; the hero is read from the deck, one main deck per hero.
+  Open any other deck for that hero and a **vs main** panel appears on the right:
+  `+N` / `−N` per card by total copies (deck + sideboard combined), with hover
+  previews. It refreshes on navigation, on returning to the tab, and via ↻.
 
 ## Development
 
@@ -73,6 +83,9 @@ after any edit under `src/`, `public/`, `scripts/`, or the build config.
 - `src/content.ts` — content script on fabrary; mirrors the Cognito token into
   `chrome.storage`, and installs the injected tabs.
 - `src/deck-tab.ts` — the **Packrat** deck tab.
+- `src/deck-diff/` — the **vs main** margin panel: `model.ts` (list diff), `panel.ts` (UI).
+- `src/main-decks.ts` — the per-hero main-deck table in `chrome.storage.sync`.
+- `src/options/` — the Options page that manages main decks.
 - `src/sideboard/` — the **Sideboard** feature: `model.ts` (sideboard logic),
   `panel.ts` (UI), `tab.ts` (tab injection), `styles.ts`, `hover-preview.ts`.
 - `src/fab-api/` — typed client for fabrary's AppSync GraphQL API
@@ -80,7 +93,7 @@ after any edit under `src/`, `public/`, `scripts/`, or the build config.
 - `src/background.ts` — service worker that keeps the toolbar badge in sync.
 - `src/popup/` — the toolbar popup.
 - `src/config.ts` — endpoints, Cognito client id, and URL/slug helpers.
-- `public/` — `manifest.json`, popup HTML/CSS, icons (copied verbatim into `dist/`).
+- `public/` — `manifest.json`, popup and options HTML/CSS, icons (copied verbatim into `dist/`).
 - `build.mjs` — the esbuild bundler (ES modules for the worker/popup, a classic
   IIFE for the content script).
 
@@ -101,9 +114,10 @@ query, and auth header fabrary's own site uses.
 
 ## Permissions
 
-- **`storage`** — cache the captured token for the popup.
-- **host access to fabrary's AppSync GraphQL endpoint** — so the Sideboard can read
-  and write your deck.
+- **`storage`** — cache the captured token for the popup, and keep the main-deck
+  table (synced with your Chrome profile).
+- **host access to fabrary's AppSync GraphQL endpoint** — so the Sideboard, the
+  diff panel and the options page can read (and the Sideboard write) your decks.
 - **content scripts on `fabrary.net` / `fabrary.com`** — to read the token and
   inject the tabs.
 

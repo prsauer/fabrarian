@@ -95,6 +95,10 @@ function activateTab(deckId: string): void {
     panel = new SideboardPanel(container, deckId);
     panelDeckId = deckId;
     void panel.load();
+  } else {
+    // The deck may have been edited on fabrary's own tabs since we last looked;
+    // re-fetch every time the tab is entered so the list is never stale.
+    void panel.refresh();
   }
   applySelectedLook(list);
 }
